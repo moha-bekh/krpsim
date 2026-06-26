@@ -1,0 +1,6 @@
+/krpsim
+/krpsim_verif
+*.o
+*.d
+build/
+.DS_Store
