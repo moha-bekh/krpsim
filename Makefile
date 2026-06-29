@@ -1,25 +1,45 @@
 CXX := c++
-CXXFLAGS := -Wall -Wextra -Werror -std=c++17 -Iinclude
+CXXFLAGS := -Wall -Wextra -Werror -std=c++17 -g3
+INCLUDES := -Iinclude
+DEPFLAGS := -MMD -MP
 
-KRPSIM := krpsim
-KRPSIM_VERIF := krpsim_verif
+BUILD_DIR := build
 
-KRPSIM_SRCS := src/krpsim_main.cpp
-VERIF_SRCS := src/krpsim_verif_main.cpp
+KRPSIM_SRCS := src/KrpsimMain.cpp
+VERIF_SRCS := src/KrpsimVerifMain.cpp
 
-.PHONY: all clean fclean re
+KRPSIM_OBJS := $(KRPSIM_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
+VERIF_OBJS := $(VERIF_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
+DEPS := $(KRPSIM_OBJS:.o=.d) $(VERIF_OBJS:.o=.d)
+
+KRPSIM := $(BUILD_DIR)/krpsim
+KRPSIM_VERIF := $(BUILD_DIR)/krpsim_verif
 
 all: $(KRPSIM) $(KRPSIM_VERIF)
 
-$(KRPSIM): $(KRPSIM_SRCS)
-	$(CXX) $(CXXFLAGS) $(KRPSIM_SRCS) -o $(KRPSIM)
+$(KRPSIM): $(KRPSIM_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(KRPSIM_VERIF): $(VERIF_SRCS)
-	$(CXX) $(CXXFLAGS) $(VERIF_SRCS) -o $(KRPSIM_VERIF)
+$(KRPSIM_VERIF): $(VERIF_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/%.o: src/%.cpp
+	mkdir -p $(dir $@)
+	$(CXX) $(INCLUDES) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+run: $(KRPSIM)
+	./$(KRPSIM)
+
+verif: $(KRPSIM_VERIF)
+	./$(KRPSIM_VERIF)
 
 clean:
+	rm -rf $(BUILD_DIR)
 
 fclean: clean
-	rm -f $(KRPSIM) $(KRPSIM_VERIF)
 
 re: fclean all
+
+.PHONY: all clean fclean re run verif
+
+-include $(DEPS)
