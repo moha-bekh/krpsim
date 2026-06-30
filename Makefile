@@ -5,9 +5,21 @@ DEPFLAGS := -MMD -MP
 
 BUILD_DIR := build
 
-COMMON_SRCS := src/MockConfigs.cpp src/Simulator.cpp src/Solver.cpp
-KRPSIM_SRCS := src/KrpsimMain.cpp $(COMMON_SRCS)
-VERIF_SRCS := src/KrpsimVerifMain.cpp $(COMMON_SRCS)
+CORE_SRCS := \
+	src/core/Simulator.cpp \
+	src/core/Verifier.cpp
+
+MOCK_SRCS := \
+	src/mocks/MockConfigs.cpp
+
+SOLVER_SRCS := \
+	src/solver/Solver.cpp
+
+DEBUG_SRCS := \
+	src/debug/Debug.cpp
+
+KRPSIM_SRCS := src/KrpsimMain.cpp $(CORE_SRCS) $(MOCK_SRCS) $(SOLVER_SRCS) $(DEBUG_SRCS)
+VERIF_SRCS := src/KrpsimVerifMain.cpp $(CORE_SRCS)
 
 KRPSIM_OBJS := $(KRPSIM_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 VERIF_OBJS := $(VERIF_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
