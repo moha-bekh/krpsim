@@ -8,5 +8,7 @@ Config simpleDemo();
 Config ikeaDemo();
 Config steakDemo();
 Config recreDemo();
+Config pommeDemo();
+Config inceptionDemo();
 
 } // namespace krpsim::mock
