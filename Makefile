@@ -5,7 +5,12 @@ DEPFLAGS := -MMD -MP
 
 BUILD_DIR := build
 
-KRPSIM_SRCS := src/KrpsimMain.cpp
+SHARED_SRCS := \
+	src/core/Simulator.cpp \
+	src/mocks/MockConfigs.cpp \
+	src/debug/Debug.cpp
+
+KRPSIM_SRCS := src/KrpsimMain.cpp $(SHARED_SRCS)
 VERIF_SRCS := src/KrpsimVerifMain.cpp
 
 KRPSIM_OBJS := $(KRPSIM_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
