@@ -34,12 +34,12 @@ bool canStartProcess(const SimulationState &state, const Process &process) {
 void startProcess(SimulationState& state, const Process& process) {
 
   // WARNING: It's the responsability of the caller-func to check if the process can start (utils func "canStartProcess")
-  
+
   // WARNING: DEV assertion to remove
 
   assert(canStartProcess(state, process));
 
-  for (StockMap::const_iterator needsIt = process.needs.begin(); 
+  for (StockMap::const_iterator needsIt = process.needs.begin();
         needsIt != process.needs.end(); ++needsIt) {
 
     const std::string &resource = needsIt->first;
@@ -64,7 +64,7 @@ void completeEventsAtCycle(SimulationState& state, Cycle cycle) {
 
   state.cycle = cycle;
 
-  for (std::vector<Event>::iterator eventIt = state.runningEvents.begin(); 
+  for (std::vector<Event>::iterator eventIt = state.runningEvents.begin();
         eventIt != state.runningEvents.end();) {
 
     if (eventIt->endCycle == cycle) {
