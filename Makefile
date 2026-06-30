@@ -7,6 +7,7 @@ BUILD_DIR := build
 
 SHARED_SRCS := \
 	src/core/Simulator.cpp \
+	src/core/Verifier.cpp \
 	src/mocks/MockConfigs.cpp \
 	src/debug/Debug.cpp
 
