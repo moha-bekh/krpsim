@@ -4,6 +4,7 @@
 
 #include "krpsim/Debug.hpp"
 #include "krpsim/MockConfigs.hpp"
+#include "krpsim/Parser.hpp"
 #include "krpsim/Solver.hpp"
 
 static bool loadMockConfig(const std::string& name, krpsim::Config& config)
@@ -40,6 +41,16 @@ static void printAvailableMocks()
     std::cerr << "Available mocks: simple, ikea, steak, recre, pomme, inception\n";
 }
 
+static krpsim::Config loadConfig(const std::string& input)
+{
+    krpsim::Config config;
+
+    if (loadMockConfig(input, config)) {
+        return config;
+    }
+    return krpsim::parseConfigFile(input);
+}
+
 static void runDevSuite()
 {
     const krpsim::Cycle maxCycle = 1000;
@@ -68,15 +79,16 @@ int main(int argc, char** argv)
     }
 
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <mock_name> <delay>\n";
+        std::cerr << "Usage: " << argv[0] << " <file|mock_name> <delay>\n";
         printAvailableMocks();
         return 1;
     }
 
     krpsim::Config config;
-    if (!loadMockConfig(argv[1], config)) {
-        std::cerr << "Unknown mock config: " << argv[1] << "\n";
-        printAvailableMocks();
+    try {
+        config = loadConfig(argv[1]);
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << "\n";
         return 1;
     }
 

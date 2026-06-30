@@ -15,11 +15,14 @@ MOCK_SRCS := \
 SOLVER_SRCS := \
 	src/solver/Solver.cpp
 
+PARSER_SRCS := \
+	src/parser/Parser.cpp
+
 DEBUG_SRCS := \
 	src/debug/Debug.cpp
 
-KRPSIM_SRCS := src/KrpsimMain.cpp $(CORE_SRCS) $(MOCK_SRCS) $(SOLVER_SRCS) $(DEBUG_SRCS)
-VERIF_SRCS := src/KrpsimVerifMain.cpp $(CORE_SRCS)
+KRPSIM_SRCS := src/KrpsimMain.cpp $(CORE_SRCS) $(MOCK_SRCS) $(SOLVER_SRCS) $(PARSER_SRCS) $(DEBUG_SRCS)
+VERIF_SRCS := src/KrpsimVerifMain.cpp $(CORE_SRCS) $(MOCK_SRCS) $(SOLVER_SRCS) $(PARSER_SRCS) $(DEBUG_SRCS)
 
 KRPSIM_OBJS := $(KRPSIM_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 VERIF_OBJS := $(VERIF_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
