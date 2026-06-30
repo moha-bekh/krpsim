@@ -1,6 +1,8 @@
 #include "krpsim/Debug.hpp"
 
+#include "krpsim/MockConfigs.hpp"
 #include "krpsim/Simulator.hpp"
+#include "krpsim/Verifier.hpp"
 
 #include <iostream>
 
@@ -156,12 +158,12 @@ void printVerificationResult(const VerificationResult& result) {
   }
 }
 
-SimulationResult runNaiveSolverDemo(const Config& config) {
+SimulationResult runNaiveSolverDemo(const Config& config, Cycle maxCycle) {
   SimulationResult result;
 
   result.finalState = makeInitialState(config);
 
-  while (true) {
+  while (result.finalState.cycle <= maxCycle) {
     bool startedSomething = false;
 
     for (std::vector<Process>::const_iterator processIt = config.processes.begin();
@@ -196,11 +198,24 @@ SimulationResult runNaiveSolverDemo(const Config& config) {
     }
 
     Cycle nextCycle = nextEventCycle(result.finalState);
+    if (nextCycle > maxCycle) {
+      break;
+    }
     completeEventsAtCycle(result.finalState, nextCycle);
     printSimulationState(result.finalState);
   }
 
   return result;
+}
+
+void runNaiveSolverDemoCase(const std::string& name, const Config& config, Cycle maxCycle) {
+  std::cout << "\n===== " << name << " =====\n";
+
+  SimulationResult simulation = runNaiveSolverDemo(config, maxCycle);
+  printTrace(simulation.trace);
+
+  VerificationResult verification = verifyTrace(config, simulation.trace);
+  printVerificationResult(verification);
 }
 
 } // namespace krpsim::debug

@@ -12,17 +12,31 @@ int main(int argc, char **argv) {
 
     // WARNING: DEV mode witch mock configs
 
-    krpsim::Config config = krpsim::mock::simpleDemo();
-    // krpsim::debug::printConfig(config);
+    const krpsim::Cycle maxCycle = 1000;
 
-    krpsim::SimulationState state = krpsim::makeInitialState(config);
-    // krpsim::debug::printSimulationState(state);
+    // Single scenario mode:
+    // krpsim::debug::runNaiveSolverDemoCase("simple", krpsim::mock::simpleDemo(), maxCycle);
 
-    krpsim::SimulationResult simulation = krpsim::debug::runNaiveSolverDemo(config);
-    // krpsim::debug::printTrace(simulation.trace);
+    // Suite mode: comment or uncomment scenarios while testing.
+    struct DemoCase {
+      const char* name;
+      krpsim::Config config;
+    };
 
-    krpsim::VerificationResult verification = verifyTrace(config, simulation.trace);
-    krpsim::debug::printVerificationResult(verification);
+    std::vector<DemoCase> demos = {
+      {"simple", krpsim::mock::simpleDemo()},
+      {"ikea", krpsim::mock::ikeaDemo()},
+      {"steak", krpsim::mock::steakDemo()},
+      // {"recre", krpsim::mock::recreDemo()},
+      // {"pomme", krpsim::mock::pommeDemo()},
+      // {"inception", krpsim::mock::inceptionDemo()},
+    };
+
+    for (std::vector<DemoCase>::const_iterator it = demos.begin();
+         it != demos.end();
+         ++it) {
+      krpsim::debug::runNaiveSolverDemoCase(it->name, it->config, maxCycle);
+    }
 
     return 0;
   }
