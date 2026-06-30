@@ -1,7 +1,7 @@
 # krpsim
 
 Temporary project README. The project is still in development, but the core
-engine is already usable with mocked configurations.
+engine is already usable with mocked configurations and resource files.
 
 ## Goal
 
@@ -26,15 +26,16 @@ Implemented:
   `Trace`);
 - simulator primitives;
 - trace verifier;
+- config parser for resource files;
+- trace parser for verifier input;
 - debug printers;
 - mocked configs based on the resource files;
-- temporary naive demo runner.
+- naive solver.
 
 Not implemented yet:
 
-- real parser from config files;
-- real solver strategies;
-- final CLI behavior;
+- optimized solver strategies;
+- final evaluator-ready binary layout;
 - benchmark runner.
 
 ## Architecture
@@ -56,7 +57,7 @@ The simulator is the source of truth:
 
 - a solver generates a `Trace`;
 - the verifier replays a `Trace`;
-- the parser will later only build a `Config`.
+- the parser builds a `Config` from a resource file.
 
 ## Core Rules
 
@@ -94,6 +95,35 @@ make run
 make verif
 make clean
 make re
+```
+
+## Current CLI
+
+The current `krpsim` executable accepts either a mock name or a real resource
+file:
+
+```sh
+./build/krpsim simple 100
+./build/krpsim resources/simple 100
+./build/krpsim resources/ikea 100
+```
+
+The first argument is the config source. The second argument is the maximum
+cycle used by the naive solver.
+
+The current `krpsim_verif` executable accepts either a mock name or a real
+resource file, then a trace file:
+
+```sh
+./build/krpsim_verif resources/simple trace.txt
+```
+
+Trace files use the subject format:
+
+```text
+0:achat_materiel
+10:realisation_produit
+40:livraison
 ```
 
 ## Development Demo
@@ -142,6 +172,22 @@ The recommended test order is:
 simple -> ikea -> steak -> recre -> pomme -> inception
 ```
 
+## Parser
+
+The config parser currently supports:
+
+- comments starting with `#`;
+- initial stocks with `name:quantity`;
+- processes with `name:(needs):(results):duration`;
+- empty result groups, for example `manger:(bonbon:1)::10`;
+- `optimize:(time;resource)` targets.
+
+The trace parser supports lines in the form:
+
+```text
+cycle:process_name
+```
+
 ## Trace Verification
 
 The verifier checks whether a trace is legal for a given config.
@@ -174,14 +220,13 @@ It returns a `VerificationResult` with:
 
 Short-term:
 
-- sync engine work with the solver branch;
-- move the temporary naive demo toward a real `solveNaive`;
-- test simulator/verifier against `ikea`, `steak`, and `recre`;
-- add parser once the engine is stable.
+- improve solver strategy beyond `solveNaive`;
+- test parser/verifier against invalid input files;
+- produce evaluator-ready executables at repository root if needed.
 
 Longer-term:
 
 - implement several solver strategies;
 - compare generated traces;
 - add benchmarks;
-- wire the final CLI to parser + solver + verifier.
+- replace temporary mock/dev CLI with final subject CLI behavior.
