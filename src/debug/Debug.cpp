@@ -1,5 +1,7 @@
 #include "krpsim/Debug.hpp"
 
+#include "krpsim/Simulator.hpp"
+
 #include <iostream>
 
 namespace krpsim::debug {
@@ -35,7 +37,7 @@ void printProcess(const Process& process) {
 }
 
 void printConfig(const Config& config) {
-  std::cout << "Config\n";
+  std::cout << "\nConfig\n";
   std::cout << SEPARATOR;
 
   std::cout << "Initial stocks:\n";
@@ -83,7 +85,7 @@ void printTraceAction(const TraceAction& action) {
 }
 
 void printTrace(const Trace& trace) {
-  std::cout << "Trace\n";
+  std::cout << "\nTrace\n";
   std::cout << SEPARATOR;
 
   if (trace.empty()) {
@@ -97,7 +99,7 @@ void printTrace(const Trace& trace) {
 }
 
 void printSimulationState(const SimulationState& state) {
-  std::cout << "Simulation state\n";
+  std::cout << "\nSimulation state\n";
   std::cout << SEPARATOR;
 
   std::cout << "Cycle:\n";
@@ -125,7 +127,7 @@ void printSimulationState(const SimulationState& state) {
 }
 
 void printSimulationResult(const SimulationResult& result) {
-  std::cout << "Simulation result\n";
+  std::cout << "\nSimulation result\n";
   std::cout << SEPARATOR;
 
   printTrace(result.trace);
@@ -134,7 +136,7 @@ void printSimulationResult(const SimulationResult& result) {
 }
 
 void printVerificationResult(const VerificationResult& result) {
-  std::cout << "Verification result\n";
+  std::cout << "\nVerification result\n";
   std::cout << SEPARATOR;
 
   std::cout << "Status:\n";
@@ -152,6 +154,53 @@ void printVerificationResult(const VerificationResult& result) {
     std::cout << "\nError:\n";
     std::cout << "  " << result.errorMessage << "\n";
   }
+}
+
+SimulationResult runNaiveSolverDemo(const Config& config) {
+  SimulationResult result;
+
+  result.finalState = makeInitialState(config);
+
+  while (true) {
+    bool startedSomething = false;
+
+    for (std::vector<Process>::const_iterator processIt = config.processes.begin();
+         processIt != config.processes.end();
+         ++processIt) {
+      bool canStart = canStartProcess(result.finalState, *processIt);
+
+      if (canStart) {
+        std::cout << "Starting " << processIt->name
+                  << " at cycle " << result.finalState.cycle << "\n";
+
+        TraceAction action = {
+          result.finalState.cycle,
+          processIt->name
+        };
+
+        result.trace.push_back(action);
+
+        startProcess(result.finalState, *processIt);
+        // printSimulationState(result.finalState);
+
+        startedSomething = true;
+      }
+    }
+
+    if (startedSomething) {
+      continue;
+    }
+
+    if (hasPendingEvents(result.finalState) == false) {
+      break;
+    }
+
+    Cycle nextCycle = nextEventCycle(result.finalState);
+    completeEventsAtCycle(result.finalState, nextCycle);
+    printSimulationState(result.finalState);
+  }
+
+  return result;
 }
 
 } // namespace krpsim::debug

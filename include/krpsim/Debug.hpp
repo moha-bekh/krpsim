@@ -14,4 +14,6 @@ void printSimulationState(const SimulationState& state);
 void printSimulationResult(const SimulationResult& result);
 void printVerificationResult(const VerificationResult& result);
 
+SimulationResult runNaiveSolverDemo(const Config& config);
+
 } // namespace krpsim::debug
