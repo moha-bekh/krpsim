@@ -133,6 +133,13 @@ void printSimulationResult(const SimulationResult& result) {
   std::cout << "\nSimulation result\n";
   std::cout << SEPARATOR;
 
+  std::cout << "Solver:\n";
+  if (result.solverName.empty()) {
+    std::cout << "  unknown\n\n";
+  } else {
+    std::cout << "  " << result.solverName << "\n\n";
+  }
+
   printTrace(result.trace);
   std::cout << "\n";
   printSimulationState(result.finalState);

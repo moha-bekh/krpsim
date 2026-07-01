@@ -104,7 +104,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    krpsim::SimulationResult result = krpsim::solveNaive(config, maxCycle);
+    krpsim::SimulationResult result = krpsim::solveBest(config, maxCycle);
     krpsim::debug::printSimulationResult(result);
     return 0;
 }

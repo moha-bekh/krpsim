@@ -13,4 +13,14 @@ std::vector<const Process*> getStartableProcesses(
 
 SimulationResult solveNaive(const Config& config, Cycle maxCycle);
 
+SimulationResult solveTargetPlan(const Config& config, Cycle maxCycle);
+
+bool isBetterResult(
+    const Config& config,
+    const SimulationResult& candidate,
+    const SimulationResult& currentBest
+);
+
+SimulationResult solveBest(const Config& config, Cycle maxCycle);
+
 } // namespace krpsim

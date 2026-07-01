@@ -30,11 +30,13 @@ Implemented:
 - trace parser for verifier input;
 - debug printers;
 - mocked configs based on the resource files;
-- naive solver.
+- naive solver;
+- target-plan solver for simple dependency chains;
+- basic solver result comparison with `solveBest`.
 
 Not implemented yet:
 
-- optimized solver strategies;
+- advanced optimized solver strategies;
 - final evaluator-ready binary layout;
 - benchmark runner.
 
@@ -109,7 +111,7 @@ file:
 ```
 
 The first argument is the config source. The second argument is the maximum
-cycle used by the naive solver.
+cycle used by the solver.
 
 The current `krpsim_verif` executable accepts either a mock name or a real
 resource file, then a trace file:
@@ -188,6 +190,32 @@ The trace parser supports lines in the form:
 cycle:process_name
 ```
 
+## Solvers
+
+Current solver functions:
+
+- `solveNaive`: launches the first startable process.
+- `solveTargetPlan`: starts from the first optimized resource, builds a simple
+  dependency plan, then executes the required processes.
+- `solveBest`: runs multiple solver strategies and keeps the best result using
+  the configured `optimize` targets.
+
+`SimulationResult` includes the selected solver name, so command output shows
+which strategy was kept.
+
+Example: for `resources/ikea`, `solveTargetPlan` can build the exact component
+plan needed for one `armoire`:
+
+```text
+0:do_montant
+0:do_montant
+0:do_fond
+0:do_etagere
+0:do_etagere
+0:do_etagere
+20:do_armoire_ikea
+```
+
 ## Trace Verification
 
 The verifier checks whether a trace is legal for a given config.
@@ -220,13 +248,13 @@ It returns a `VerificationResult` with:
 
 Short-term:
 
-- improve solver strategy beyond `solveNaive`;
+- improve solver strategies beyond the current target-plan approach;
 - test parser/verifier against invalid input files;
 - produce evaluator-ready executables at repository root if needed.
 
 Longer-term:
 
-- implement several solver strategies;
+- implement more solver strategies;
 - compare generated traces;
 - add benchmarks;
 - replace temporary mock/dev CLI with final subject CLI behavior.

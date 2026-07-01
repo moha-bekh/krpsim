@@ -46,6 +46,7 @@ struct SimulationState {
 struct SimulationResult {
     Trace trace;
     SimulationState finalState;
+    std::string solverName;
 };
 
 struct VerificationResult {

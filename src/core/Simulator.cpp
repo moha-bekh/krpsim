@@ -1,7 +1,7 @@
 #include "krpsim/Simulator.hpp"
 
-#include <cassert>
 #include <climits>
+#include <stdexcept>
 
 namespace krpsim {
 
@@ -33,11 +33,9 @@ bool canStartProcess(const SimulationState &state, const Process &process) {
 
 void startProcess(SimulationState& state, const Process& process) {
 
-  // WARNING: It's the responsability of the caller-func to check if the process can start (utils func "canStartProcess")
-
-  // WARNING: DEV assertion to remove
-
-  assert(canStartProcess(state, process));
+  if (canStartProcess(state, process) == false) {
+    throw std::runtime_error("Cannot start process: " + process.name);
+  }
 
   for (StockMap::const_iterator needsIt = process.needs.begin();
         needsIt != process.needs.end(); ++needsIt) {
