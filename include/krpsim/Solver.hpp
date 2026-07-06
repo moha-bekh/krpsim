@@ -15,6 +15,8 @@ SimulationResult solveNaive(const Config& config, Cycle maxCycle);
 
 SimulationResult solveTargetPlan(const Config& config, Cycle maxCycle);
 
+SimulationResult solveGreedyByScore(const Config& config, Cycle maxCycle);
+
 bool isBetterResult(
     const Config& config,
     const SimulationResult& candidate,

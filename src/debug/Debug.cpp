@@ -166,15 +166,15 @@ void printVerificationResult(const VerificationResult& result) {
   }
 }
 
-SimulationResult runNaiveSolverDemo(const Config& config, Cycle maxCycle) {
-  return solveNaive(config, maxCycle);
+SimulationResult runBestSolverDemo(const Config& config, Cycle maxCycle) {
+  return solveBest(config, maxCycle);
 }
 
-void runNaiveSolverDemoCase(const std::string& name, const Config& config, Cycle maxCycle) {
+void runBestSolverDemoCase(const std::string& name, const Config& config, Cycle maxCycle) {
   std::cout << "\n===== " << name << " =====\n";
 
-  SimulationResult simulation = runNaiveSolverDemo(config, maxCycle);
-  printTrace(simulation.trace);
+  SimulationResult simulation = runBestSolverDemo(config, maxCycle);
+  printSimulationResult(simulation);
 
   VerificationResult verification = verifyTrace(config, simulation.trace);
   printVerificationResult(verification);

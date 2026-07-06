@@ -67,7 +67,7 @@ static void runDevSuite()
     };
 
     for (const DemoCase& demo : demos) {
-        krpsim::debug::runNaiveSolverDemoCase(demo.name, demo.config, maxCycle);
+        krpsim::debug::runBestSolverDemoCase(demo.name, demo.config, maxCycle);
     }
 }
 

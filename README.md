@@ -136,8 +136,8 @@ Running without arguments starts the temporary development mode:
 make run
 ```
 
-This mode uses mocked configs from `src/mocks/MockConfigs.cpp`, runs a naive
-solver demo, prints the generated trace, and verifies it.
+This mode uses mocked configs from `src/mocks/MockConfigs.cpp`, runs the best
+available solver, prints the generated trace, and verifies it.
 
 The current demo list is in `src/KrpsimMain.cpp`:
 
@@ -197,6 +197,8 @@ Current solver functions:
 - `solveNaive`: launches the first startable process.
 - `solveTargetPlan`: starts from the first optimized resource, builds a simple
   dependency plan, then executes the required processes.
+- `solveGreedyByScore`: scores every startable process at each cycle using the
+  optimized resources and their dependencies.
 - `solveBest`: runs multiple solver strategies and keeps the best result using
   the configured `optimize` targets.
 
