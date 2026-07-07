@@ -128,34 +128,32 @@ Trace files use the subject format:
 40:livraison
 ```
 
-## Development Demo
+Verifier fixtures are available in `traces/`.
 
-Running without arguments starts the temporary development mode:
+## Quick Run
+
+Build and run a simple example:
 
 ```sh
 make run
 ```
 
-This mode uses mocked configs from `src/mocks/MockConfigs.cpp`, runs the best
-available solver, prints the generated trace, and verifies it.
+This runs:
 
-The current demo list is in `src/KrpsimMain.cpp`:
-
-```cpp
-std::vector<DemoCase> demos = {
-  {"simple", krpsim::mock::simpleDemo()},
-  {"ikea", krpsim::mock::ikeaDemo()},
-  {"steak", krpsim::mock::steakDemo()},
-  // {"recre", krpsim::mock::recreDemo()},
-  // {"pomme", krpsim::mock::pommeDemo()},
-  // {"inception", krpsim::mock::inceptionDemo()},
-};
+```sh
+./build/krpsim resources/simple 100
 ```
 
-Comment or uncomment scenarios to test them.
+Running without arguments now prints usage and exits with an error, matching the
+subject CLI expectation.
 
-`recre`, `pomme`, and `inception` can contain cycles or long-running behavior,
-so the debug runner uses a `maxCycle` limit.
+Mock configs still exist for development in `src/mocks/MockConfigs.cpp`:
+
+```cpp
+krpsim::mock::simpleDemo()
+krpsim::mock::ikeaDemo()
+krpsim::mock::steakDemo()
+```
 
 ## Mock Configs
 
@@ -259,4 +257,4 @@ Longer-term:
 - implement more solver strategies;
 - compare generated traces;
 - add benchmarks;
-- replace temporary mock/dev CLI with final subject CLI behavior.
+- keep aligning output with final subject expectations.

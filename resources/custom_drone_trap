@@ -1,0 +1,16 @@
+#
+# custom finite config - naive trap
+#
+# Goal: naive tends to consume all ore into plates.
+# Target planning should produce exactly the plate/wire/battery mix needed
+# for one drone.
+#
+ore:10
+#
+make_plate:(ore:1):(plate:1):5
+make_wire:(ore:1):(wire:2):4
+make_battery:(ore:3):(battery:1):6
+build_drone:(plate:2;wire:4;battery:1):(drone:1):15
+#
+optimize:(time;drone)
+

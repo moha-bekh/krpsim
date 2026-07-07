@@ -1,0 +1,18 @@
+#
+# custom long-running config - renewable production loop
+#
+# Goal: demonstrate a system that can keep producing over time.
+# The gardener and tree are reusable resources.
+#
+seed:1
+water:3
+gardener:1
+#
+plant_seed:(seed:1;water:1;gardener:1):(sprout:1;gardener:1):5
+grow_tree:(sprout:1;water:1;gardener:1):(tree:1;seed:2;gardener:1):10
+collect_fruit:(tree:1;gardener:1):(tree:1;fruit:3;gardener:1):8
+sell_fruit:(fruit:3):(coin:1):2
+draw_water:(gardener:1):(water:1;gardener:1):4
+#
+optimize:(coin)
+

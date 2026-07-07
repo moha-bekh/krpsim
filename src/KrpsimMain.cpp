@@ -51,33 +51,8 @@ static krpsim::Config loadConfig(const std::string& input)
     return krpsim::parseConfigFile(input);
 }
 
-static void runDevSuite()
-{
-    const krpsim::Cycle maxCycle = 1000;
-
-    struct DemoCase {
-        const char* name;
-        krpsim::Config config;
-    };
-
-    std::vector<DemoCase> demos = {
-        {"simple", krpsim::mock::simpleDemo()},
-        {"ikea", krpsim::mock::ikeaDemo()},
-        {"steak", krpsim::mock::steakDemo()},
-    };
-
-    for (const DemoCase& demo : demos) {
-        krpsim::debug::runBestSolverDemoCase(demo.name, demo.config, maxCycle);
-    }
-}
-
 int main(int argc, char** argv)
 {
-    if (argc == 1) {
-        runDevSuite();
-        return 0;
-    }
-
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <file|mock_name> <delay>\n";
         printAvailableMocks();

@@ -1,0 +1,18 @@
+#
+# custom finite config - reusable tools and parallel scheduling
+#
+# Goal: test that tools are locked during a process and returned after.
+# Process order is intentionally mixed.
+#
+chef:2
+pan:1
+oven:1
+dough:2
+filling:2
+#
+serve_pie:(pie:1;chef:1):(happy_guest:1;chef:1):3
+cook_oven_pie:(raw_pie:1;oven:1;chef:1):(pie:1;oven:1;chef:1):7
+prepare_pie:(dough:1;filling:1;chef:1):(raw_pie:1;chef:1):5
+cook_pan_pie:(raw_pie:1;pan:1;chef:1):(pie:1;pan:1;chef:1):10
+#
+optimize:(time;happy_guest)

@@ -44,10 +44,10 @@ $(BUILD_DIR)/%.o: src/%.cpp
 	$(CXX) $(INCLUDES) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 run: $(KRPSIM)
-	./$(KRPSIM)
+	./$(KRPSIM) resources/simple 100
 
 verif: $(KRPSIM_VERIF)
-	./$(KRPSIM_VERIF)
+	@echo "Usage: ./$(KRPSIM_VERIF) <file|mock_name> <result_to_test>"
 
 clean:
 	rm -rf $(BUILD_DIR)

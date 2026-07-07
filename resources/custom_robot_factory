@@ -1,0 +1,16 @@
+#
+# custom finite config - exact assembly planning
+#
+# Goal: show that target planning can build the exact intermediate parts.
+# Process order is intentionally not topological.
+#
+metal:8
+plastic:6
+worker:2
+#
+assemble_robot:(frame:1;motor:1;shell:1;worker:2):(robot:1;worker:2):20
+do_shell:(plastic:3;worker:1):(shell:1;worker:1):8
+do_motor:(metal:2;plastic:1;worker:1):(motor:1;worker:1):15
+do_frame:(metal:3;worker:1):(frame:1;worker:1):10
+#
+optimize:(time;robot)
