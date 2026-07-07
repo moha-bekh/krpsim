@@ -2,6 +2,7 @@
 
 #include "krpsim/Simulator.hpp"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -496,6 +497,151 @@ SimulationResult solveGreedyByScore(const Config& config, Cycle maxCycle)
     return result;
 }
 
+struct BeamNode {
+  SimulationState state;
+  Trace trace;
+  long long score = 0;
+};
+
+long long scoreBeamState(
+  const Config& config,
+  const SimulationState& state,
+  const std::map<std::string, Quantity>& weights,
+  const Trace& trace
+) {
+  long long score = 0;
+
+  for (const auto& weight : weights) {
+    const std::string& resource = weight.first;
+    Quantity resourceWeight = weight.second;
+    score += getExpectedQuantity(state, resource) * resourceWeight;
+  }
+
+  score -= state.cycle * 10;
+  score -= static_cast<long long>(trace.size());
+
+  if (config.optimizeTime) {
+    score -= state.cycle;
+  }
+
+  return score;
+}
+
+std::vector<BeamNode> expandNode(
+  const Config& config,
+  const BeamNode& node,
+  const std::map<std::string, Quantity>& weights,
+  Cycle maxCycle
+) {
+  std::vector<BeamNode> children;
+
+  std::vector<const Process*> startableProcesses = getStartableProcesses(config, node.state);
+
+  for (const Process* process : startableProcesses) {
+    BeamNode child = node;
+
+    if (child.state.cycle + process->duration > maxCycle) {
+      continue;
+    }
+
+    child.trace.push_back(TraceAction{
+      child.state.cycle,
+      process->name
+    });
+
+    startProcess(child.state, *process);
+    child.score = scoreBeamState(config, child.state, weights, child.trace);
+
+    children.push_back(child);
+  }
+
+  if (hasPendingEvents(node.state)) {
+    Cycle nextCycle = nextEventCycle(node.state);
+
+    if (nextCycle <= maxCycle) {
+      BeamNode child = node;
+      child.state.cycle = nextCycle;
+      child.score = scoreBeamState(config, child.state, weights, child.trace);
+      children.push_back(child);
+    }
+  }
+
+  return children;
+}
+
+SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle) {
+
+  const std::map<std::string, Quantity> weights = buildResourceWeights(config);
+
+  BeamNode initialNode;
+  initialNode.state = makeInitialState(config);
+  initialNode.trace = Trace();
+  initialNode.score = scoreBeamState(
+    config, 
+    initialNode.state,
+    weights,
+    initialNode.trace
+  );
+
+  std::vector<BeamNode> beam;
+  beam.push_back(initialNode);
+
+  const std::size_t beamWidth = 20;
+
+  SimulationResult best;
+  best.solverName = "solveBeamSearch";
+  best.finalState = initialNode.state;
+  best.trace = initialNode.trace;
+
+  const std::size_t maxTraceLength =
+    static_cast<std::size_t>(maxCycle + 1) * config.processes.size() + 100;
+
+  while (!beam.empty()) {
+    std::vector<BeamNode> candidates;
+
+    for (BeamNode node : beam) {
+      completeEventsAtCycle(node.state, node.state.cycle);
+
+      SimulationResult candidateResult;
+      candidateResult.solverName = "solveBeamSearch";
+      candidateResult.finalState = node.state;
+      candidateResult.trace = node.trace;
+
+      if (isBetterResult(config, candidateResult, best)) {
+        best = candidateResult;
+      }
+
+      if (node.trace.size() >= maxTraceLength) {
+        continue;
+      }
+
+      std::vector<BeamNode> children = expandNode(config, node, weights, maxCycle);
+
+      candidates.insert(candidates.end(), children.begin(), children.end());
+    }
+
+    if (candidates.empty()) {
+      break;
+    }
+
+    std::sort(
+      candidates.begin(), 
+      candidates.end(),
+      [](const BeamNode& lhs, const BeamNode& rhs) {
+        return lhs.score > rhs.score;
+      }
+    );
+
+    if (candidates.size() > beamWidth) {
+      candidates.resize(beamWidth);
+    }
+
+    beam = candidates;
+  }
+
+  return best;
+}
+
 bool isBetterResult(
     const Config& config,
     const SimulationResult& candidate,
@@ -522,6 +668,7 @@ SimulationResult solveBest(const Config& config, Cycle maxCycle)
     SimulationResult best = solveNaive(config, maxCycle);
     SimulationResult targetPlan = solveTargetPlan(config, maxCycle);
     SimulationResult greedyByScore = solveGreedyByScore(config, maxCycle);
+    SimulationResult beamSearch = solveBeamSearch(config, maxCycle);
 
     if (isBetterResult(config, targetPlan, best)) {
         best = targetPlan;
@@ -529,6 +676,10 @@ SimulationResult solveBest(const Config& config, Cycle maxCycle)
     if (isBetterResult(config, greedyByScore, best)) {
         best = greedyByScore;
     }
+    if (isBetterResult(config, beamSearch, best)) {
+        best = beamSearch;
+    }
+
     best.solverName = "solveBest -> " + best.solverName;
     return best;
 }

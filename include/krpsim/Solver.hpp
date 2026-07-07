@@ -25,4 +25,6 @@ bool isBetterResult(
 
 SimulationResult solveBest(const Config& config, Cycle maxCycle);
 
+SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle);
+
 } // namespace krpsim
