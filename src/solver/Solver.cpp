@@ -648,13 +648,42 @@ bool isBetterResult(
     const SimulationResult& currentBest
 )
 {
+    bool hasOptimizedResource = false;
+
     for (const std::string& resource : config.optimizeResources) {
         const Quantity candidateQuantity = getStockQuantity(candidate.finalState.stocks, resource);
         const Quantity bestQuantity = getStockQuantity(currentBest.finalState.stocks, resource);
 
+        if (candidateQuantity > 0 || bestQuantity > 0) {
+            hasOptimizedResource = true;
+        }
         if (candidateQuantity != bestQuantity) {
             return candidateQuantity > bestQuantity;
         }
+    }
+
+    if (config.optimizeTime
+        && hasOptimizedResource
+        && candidate.finalState.cycle != currentBest.finalState.cycle) {
+        return candidate.finalState.cycle < currentBest.finalState.cycle;
+    }
+
+    const std::map<std::string, Quantity> weights = buildResourceWeights(config);
+    const long long candidateProgress = scoreBeamState(
+        config,
+        candidate.finalState,
+        weights,
+        candidate.trace
+    );
+    const long long bestProgress = scoreBeamState(
+        config,
+        currentBest.finalState,
+        weights,
+        currentBest.trace
+    );
+
+    if (candidateProgress != bestProgress) {
+        return candidateProgress > bestProgress;
     }
 
     if (config.optimizeTime && candidate.finalState.cycle != currentBest.finalState.cycle) {
