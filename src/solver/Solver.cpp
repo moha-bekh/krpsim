@@ -158,18 +158,29 @@ Quantity scoreProcess(
     return score;
 }
 
+bool canFinishBeforeMaxCycle(
+    const SimulationState& state,
+    const Process& process,
+    Cycle maxCycle
+)
+{
+    return state.cycle + process.duration <= maxCycle;
+}
+
 const Process* chooseBestScoredProcess(
     const Config& config,
     const SimulationState& state,
     const std::map<std::string, Quantity>& weights,
-    const StockMap& caps
+    const StockMap& caps,
+    Cycle maxCycle
 )
 {
     const Process* bestProcess = nullptr;
     Quantity bestScore = 0;
 
     for (const Process& process : config.processes) {
-        if (!canStartProcess(state, process)) {
+        if (!canStartProcess(state, process)
+            || !canFinishBeforeMaxCycle(state, process, maxCycle)) {
             continue;
         }
 
@@ -325,17 +336,36 @@ bool hasRemainingBudget(const std::map<std::string, Quantity>& processBudget)
     return false;
 }
 
+void completePendingEventsUntilMaxCycle(SimulationState& state, Cycle maxCycle)
+{
+    while (hasPendingEvents(state)) {
+        const Cycle nextCycle = nextEventCycle(state);
+        if (nextCycle > maxCycle) {
+            break;
+        }
+        state.cycle = nextCycle;
+        completeEventsAtCycle(state, state.cycle);
+    }
+}
+
+void finalizeResult(SimulationResult& result, Cycle maxCycle)
+{
+    completePendingEventsUntilMaxCycle(result.finalState, maxCycle);
+}
+
 const Process* choosePlannedStartableProcess(
     const Config& config,
     const SimulationState& state,
-    const std::map<std::string, Quantity>& processBudget
+    const std::map<std::string, Quantity>& processBudget,
+    Cycle maxCycle
 )
 {
     for (const Process& process : config.processes) {
         std::map<std::string, Quantity>::const_iterator budget = processBudget.find(process.name);
         if (budget != processBudget.end()
             && budget->second > 0
-            && canStartProcess(state, process)) {
+            && canStartProcess(state, process)
+            && canFinishBeforeMaxCycle(state, process, maxCycle)) {
             return &process;
         }
     }
@@ -357,7 +387,8 @@ SimulationResult solveWithProcessBudget(
         const Process* process = choosePlannedStartableProcess(
             config,
             result.finalState,
-            processBudget
+            processBudget,
+            maxCycle
         );
 
         if (process != nullptr) {
@@ -384,6 +415,7 @@ SimulationResult solveWithProcessBudget(
     if (hasRemainingBudget(processBudget)) {
         return solveNaive(config, maxCycle);
     }
+    finalizeResult(result, maxCycle);
     return result;
 }
 
@@ -416,10 +448,18 @@ SimulationResult solveNaive(const Config& config, Cycle maxCycle)
 
         std::vector<const Process*> startableProcesses =
             getStartableProcesses(config, result.finalState);
+        const Process* process = nullptr;
 
-        if (!startableProcesses.empty()) {
-            const Process* process = startableProcesses.front();
+        for (std::vector<const Process*>::const_iterator it = startableProcesses.begin();
+             it != startableProcesses.end();
+             ++it) {
+            if (canFinishBeforeMaxCycle(result.finalState, **it, maxCycle)) {
+                process = *it;
+                break;
+            }
+        }
 
+        if (process != nullptr) {
             result.trace.push_back(TraceAction{
                 result.finalState.cycle,
                 process->name
@@ -438,6 +478,7 @@ SimulationResult solveNaive(const Config& config, Cycle maxCycle)
         }
         result.finalState.cycle = nextCycle;
     }
+    finalizeResult(result, maxCycle);
     return result;
 }
 
@@ -472,7 +513,8 @@ SimulationResult solveGreedyByScore(const Config& config, Cycle maxCycle)
             config,
             result.finalState,
             weights,
-            caps
+            caps,
+            maxCycle
         );
 
         if (process != nullptr) {
@@ -494,6 +536,7 @@ SimulationResult solveGreedyByScore(const Config& config, Cycle maxCycle)
         }
         result.finalState.cycle = nextCycle;
     }
+    finalizeResult(result, maxCycle);
     return result;
 }
 
@@ -639,6 +682,7 @@ SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle) {
     beam = candidates;
   }
 
+  finalizeResult(best, maxCycle);
   return best;
 }
 

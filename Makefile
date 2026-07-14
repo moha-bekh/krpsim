@@ -28,8 +28,8 @@ KRPSIM_OBJS := $(KRPSIM_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 VERIF_OBJS := $(VERIF_SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 DEPS := $(KRPSIM_OBJS:.o=.d) $(VERIF_OBJS:.o=.d)
 
-KRPSIM := $(BUILD_DIR)/krpsim
-KRPSIM_VERIF := $(BUILD_DIR)/krpsim_verif
+KRPSIM := krpsim
+KRPSIM_VERIF := krpsim_verif
 
 all: $(KRPSIM) $(KRPSIM_VERIF)
 
@@ -47,12 +47,13 @@ run: $(KRPSIM)
 	./$(KRPSIM) resources/simple 100
 
 verif: $(KRPSIM_VERIF)
-	@echo "Usage: ./$(KRPSIM_VERIF) <file|mock_name> <result_to_test>"
+	@echo "Usage: ./$(KRPSIM_VERIF) <file> <result_to_test>"
 
 clean:
 	rm -rf $(BUILD_DIR)
 
 fclean: clean
+	rm -f $(KRPSIM) $(KRPSIM_VERIF)
 
 re: fclean all
 

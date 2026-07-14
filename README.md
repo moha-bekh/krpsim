@@ -1,7 +1,6 @@
 # krpsim
 
-Temporary project README. The project is still in development, but the core
-engine is already usable with mocked configurations and resource files.
+Resource/process scheduling simulator for the 42 `krpsim` project.
 
 ## Goal
 
@@ -18,7 +17,7 @@ A configuration describes:
 The engine simulates process execution over cycles. Resources are consumed when
 a process starts, and results are produced only when the process finishes.
 
-## Current Status
+## Status
 
 Implemented:
 
@@ -28,17 +27,12 @@ Implemented:
 - trace verifier;
 - config parser for resource files;
 - trace parser for verifier input;
-- debug printers;
-- mocked configs based on the resource files;
 - naive solver;
 - target-plan solver for simple dependency chains;
-- basic solver result comparison with `solveBest`.
-
-Not implemented yet:
-
-- advanced optimized solver strategies;
-- final evaluator-ready binary layout;
-- benchmark runner.
+- greedy score-based solver;
+- beam-search solver;
+- solver result comparison with `solveBest`;
+- custom resource files and verifier traces for demonstrations.
 
 ## Architecture
 
@@ -87,8 +81,10 @@ make
 
 This builds:
 
-- `build/krpsim`
-- `build/krpsim_verif`
+- `krpsim`
+- `krpsim_verif`
+
+Object and dependency files are kept in `build/`.
 
 Useful commands:
 
@@ -99,33 +95,30 @@ make clean
 make re
 ```
 
-## Current CLI
+## CLI
 
-The current `krpsim` executable accepts either a mock name or a real resource
-file:
-
-```sh
-./build/krpsim simple 100
-./build/krpsim resources/simple 100
-./build/krpsim resources/ikea 100
-```
-
-The first argument is the config source. The second argument is the maximum
-cycle used by the solver.
-
-The current `krpsim_verif` executable accepts either a mock name or a real
-resource file, then a trace file:
+`krpsim` accepts a resource file and a maximum cycle:
 
 ```sh
-./build/krpsim_verif resources/simple trace.txt
+./krpsim resources/simple 100
+./krpsim resources/ikea 100
 ```
 
-Trace files use the subject format:
+The generated trace is printed on stdout in the subject format:
 
 ```text
 0:achat_materiel
 10:realisation_produit
 40:livraison
+```
+
+The solver name, final cycle and final stocks are printed on stderr so stdout
+can be redirected directly into the verifier.
+
+`krpsim_verif` accepts a resource file and a trace file:
+
+```sh
+./krpsim_verif resources/simple trace.txt
 ```
 
 Verifier fixtures are available in `traces/`.
@@ -141,7 +134,7 @@ make run
 This runs:
 
 ```sh
-./build/krpsim resources/simple 100
+./krpsim resources/simple 100
 ```
 
 Running without arguments now prints usage and exits with an error, matching the
@@ -197,11 +190,13 @@ Current solver functions:
   dependency plan, then executes the required processes.
 - `solveGreedyByScore`: scores every startable process at each cycle using the
   optimized resources and their dependencies.
+- `solveBeamSearch`: explores several promising traces and keeps the best beam
+  states.
 - `solveBest`: runs multiple solver strategies and keeps the best result using
   the configured `optimize` targets.
 
-`SimulationResult` includes the selected solver name, so command output shows
-which strategy was kept.
+`SimulationResult` includes the selected solver name, printed on stderr by
+`krpsim`.
 
 Example: for `resources/ikea`, `solveTargetPlan` can build the exact component
 plan needed for one `armoire`:
@@ -244,17 +239,16 @@ It returns a `VerificationResult` with:
 - `finalStocks`;
 - `errorMessage`.
 
-## Next Steps
+## Useful Final Checks
 
-Short-term:
+```sh
+make fclean
+make
+./krpsim resources/simple 100 > /tmp/simple.trace
+./krpsim_verif resources/simple /tmp/simple.trace
+./krpsim resources/ikea 100 > /tmp/ikea.trace
+./krpsim_verif resources/ikea /tmp/ikea.trace
+```
 
-- improve solver strategies beyond the current target-plan approach;
-- test parser/verifier against invalid input files;
-- produce evaluator-ready executables at repository root if needed.
-
-Longer-term:
-
-- implement more solver strategies;
-- compare generated traces;
-- add benchmarks;
-- keep aligning output with final subject expectations.
+Additional finite and infinite demonstration configs are in `resources/`.
+Invalid verifier traces are in `traces/`.

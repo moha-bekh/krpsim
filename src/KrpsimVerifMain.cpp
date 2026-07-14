@@ -47,7 +47,7 @@ static krpsim::Config loadConfig(const std::string& input)
 int main(int argc, char** argv)
 {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <file|mock_name> <result_to_test>\n";
+        std::cerr << "Usage: " << argv[0] << " <file> <result_to_test>\n";
         return 1;
     }
 

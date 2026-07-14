@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "krpsim/Debug.hpp"
 #include "krpsim/MockConfigs.hpp"
 #include "krpsim/Parser.hpp"
 #include "krpsim/Solver.hpp"
@@ -36,9 +35,41 @@ static bool loadMockConfig(const std::string& name, krpsim::Config& config)
     return false;
 }
 
-static void printAvailableMocks()
+static void printTrace(const krpsim::Trace& trace)
 {
-    std::cerr << "Available mocks: simple, ikea, steak, recre, pomme, inception\n";
+    for (krpsim::Trace::const_iterator it = trace.begin(); it != trace.end(); ++it) {
+        std::cout << it->cycle << ":" << it->processName << "\n";
+    }
+}
+
+static void printStockMap(const krpsim::StockMap& stocks)
+{
+    if (stocks.empty()) {
+        std::cerr << "none";
+        return;
+    }
+    for (krpsim::StockMap::const_iterator it = stocks.begin(); it != stocks.end(); ++it) {
+        if (it != stocks.begin()) {
+            std::cerr << ";";
+        }
+        std::cerr << it->first << ":" << it->second;
+    }
+}
+
+static void printSummary(const krpsim::SimulationResult& result)
+{
+    std::cerr << "Solver: ";
+    if (result.solverName.empty()) {
+        std::cerr << "unknown";
+    } else {
+        std::cerr << result.solverName;
+    }
+    std::cerr << "\n";
+
+    std::cerr << "Final cycle: " << result.finalState.cycle << "\n";
+    std::cerr << "Final stocks: ";
+    printStockMap(result.finalState.stocks);
+    std::cerr << "\n";
 }
 
 static krpsim::Config loadConfig(const std::string& input)
@@ -54,8 +85,7 @@ static krpsim::Config loadConfig(const std::string& input)
 int main(int argc, char** argv)
 {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <file|mock_name> <delay>\n";
-        printAvailableMocks();
+        std::cerr << "Usage: " << argv[0] << " <file> <delay>\n";
         return 1;
     }
 
@@ -80,6 +110,7 @@ int main(int argc, char** argv)
     }
 
     krpsim::SimulationResult result = krpsim::solveBest(config, maxCycle);
-    krpsim::debug::printSimulationResult(result);
+    printTrace(result.trace);
+    printSummary(result);
     return 0;
 }
