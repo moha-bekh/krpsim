@@ -4,9 +4,30 @@ on:
   push:
     branches:
       - "main"
+    # Only paths that can actually move a benchmark number. `push` has no
+    # partial-run logic (the `changes` job forces RUN_ALL on every push to
+    # main, to keep the baseline complete), so without this filter a
+    # docs-only push would still trigger the full 10-job run.
+    paths: &benchmark-paths
+      - "src/**"
+      - "include/krpsim/**"
+      - "resources/**"
+      - "benchmarks/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/codspeed.yml"
+      # Markdown anywhere in those trees (READMEs, CODSPEED_REPORT.md) can't
+      # move a benchmark number, so it doesn't count even when it lives
+      # under an included directory above.
+      - "!**/*.md"
   pull_request:
-  # `workflow_dispatch` allows CodSpeed to trigger backtest
-  # performance analysis in order to generate initial data.
+    # `pull_request` already gets partial/skipped shards via the `changes`
+    # job, but this still saves spinning that job up at all on a docs-only
+    # PR.
+    paths: *benchmark-paths
+  # `workflow_dispatch` is intentionally left unfiltered (paths filters
+  # don't apply to it anyway): it's an explicit, manual request to run,
+  # and CodSpeed also uses it to trigger backtest performance analysis in
+  # order to generate initial data.
   workflow_dispatch:
 
 jobs:

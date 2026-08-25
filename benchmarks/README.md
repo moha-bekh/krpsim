@@ -84,6 +84,15 @@ wrapper locally. CI (`ubuntu-latest`) is unaffected.
 
 ## CI
 
+The workflow only triggers on `push`/`pull_request` when the change touches
+a path that could actually move a benchmark number (`src/`,
+`include/krpsim/`, `resources/`, `benchmarks/`, `CMakeLists.txt`, or the
+workflow file itself — markdown files are excluded even under those paths,
+so editing this README or `CODSPEED_REPORT.md` alone doesn't trigger a run).
+This matters because `push` has no partial-run logic (see below) — without
+this filter, a docs-only push to `main` would still run the full suite.
+`workflow_dispatch` is unfiltered, since it's an explicit manual request.
+
 `.github/workflows/codspeed.yml` runs `krpsim_bench` through
 `CodSpeedHQ/action@v5` in three modes, each measuring something different:
 
