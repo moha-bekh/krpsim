@@ -10,12 +10,69 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Detects which parts of the benchmark suite are affected by this change,
+  # so pull requests only run the relevant shards (partial run). Pushes to
+  # main and manual dispatches always run everything to keep a complete
+  # baseline for future comparisons.
+  changes:
+    name: Detect affected benchmark shards
+    runs-on: ubuntu-latest
+    outputs:
+      parser: ${{ steps.filter.outputs.parser }}
+      solver: ${{ steps.filter.outputs.solver }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            parser:
+              - 'src/parser/**'
+              - 'src/core/**'
+              - 'include/krpsim/Parser.hpp'
+              - 'include/krpsim/Types.hpp'
+              - 'resources/**'
+              - 'benchmarks/bench_parser.cpp'
+              - 'benchmarks/CMakeLists.txt'
+              - 'CMakeLists.txt'
+            solver:
+              - 'src/solver/**'
+              - 'src/core/**'
+              - 'src/mocks/**'
+              - 'include/krpsim/Solver.hpp'
+              - 'include/krpsim/Types.hpp'
+              - 'benchmarks/bench_solvers.cpp'
+              - 'benchmarks/CMakeLists.txt'
+              - 'CMakeLists.txt'
+
   benchmarks:
-    name: Run benchmarks
+    name: Run benchmarks (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs[matrix.changed_key] == 'true' || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions: # optional for public repositories
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Splitting into shards keeps each CodSpeed job well under the
+          # recommended 1,000-benchmarks-per-shard limit and lets them run
+          # in parallel; it also lets partial runs skip whichever shard
+          # wasn't touched by a given pull request.
+          - name: parser
+            changed_key: parser
+            benchmark_filter: "BM_ParseConfig"
+          - name: cheap-solvers
+            changed_key: solver
+            benchmark_filter: "BM_Solve(Naive|TargetPlan|GreedyByScore)"
+          - name: beam-search
+            changed_key: solver
+            benchmark_filter: "BM_SolveBeamSearch"
+          - name: best
+            changed_key: solver
+            benchmark_filter: "BM_SolveBest"
     steps:
       - uses: actions/checkout@v5
 
@@ -28,4 +85,4 @@ jobs:
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation
-          run: ./build_bench/benchmarks/krpsim_bench
+          run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.benchmark_filter }}'

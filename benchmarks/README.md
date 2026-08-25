@@ -82,7 +82,22 @@ wrapper locally. CI (`ubuntu-latest`) is unaffected.
 
 `.github/workflows/codspeed.yml` builds with `-DCODSPEED_MODE=simulation` and
 runs `krpsim_bench` through `CodSpeedHQ/action@v5` on every push to `main` and
-on pull requests.
+on pull requests, split into 4 parallel shards via `--benchmark_filter`:
+
+| Shard | Filter | Benchmarks |
+| --- | --- | --- |
+| `parser` | `BM_ParseConfig` | 11 |
+| `cheap-solvers` | `BM_Solve(Naive\|TargetPlan\|GreedyByScore)` | 36 |
+| `beam-search` | `BM_SolveBeamSearch` | 12 |
+| `best` | `BM_SolveBest` | 6 |
+
+All 4 shards run in the same workflow so CodSpeed aggregates them into a
+single report. A `changes` job (via `dorny/paths-filter`) detects whether a
+pull request touched parser-related or solver-related paths and skips the
+irrelevant shard(s) — CodSpeed backfills the skipped benchmarks from the
+baseline run, so the report stays complete even on a partial run. Pushes to
+`main` and manual `workflow_dispatch` runs always run every shard, to keep
+the baseline itself complete.
 
 ## Adding a benchmark
 
