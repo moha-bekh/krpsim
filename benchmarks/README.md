@@ -71,6 +71,10 @@ cmake --build build_bench -j
 codspeed run -m simulation -- ./build_bench/benchmarks/krpsim_bench
 ```
 
+Swap `simulation` for `memory` or `walltime` (both in `-DCODSPEED_MODE=` and
+`-m`) to reproduce the other two CI modes locally — see below for what each
+one measures.
+
 Note: `codspeed run` requires the runner to detect the host OS version and
 currently fails with `Error: Failed to get OS version` on rolling-release
 distros without `VERSION_ID` in `/etc/os-release` (e.g. Arch Linux). The
@@ -80,9 +84,17 @@ wrapper locally. CI (`ubuntu-latest`) is unaffected.
 
 ## CI
 
-`.github/workflows/codspeed.yml` builds with `-DCODSPEED_MODE=simulation` and
-runs `krpsim_bench` through `CodSpeedHQ/action@v5` on every push to `main` and
-on pull requests, split into 4 parallel shards via `--benchmark_filter`:
+`.github/workflows/codspeed.yml` runs `krpsim_bench` through
+`CodSpeedHQ/action@v5` in three modes, each measuring something different:
+
+| Mode | What it measures | Noise |
+| --- | --- | --- |
+| `simulation` | CPU instructions, deterministic instruction-level simulation | ~none |
+| `memory` | Allocation counts / peak memory, deterministic | ~none |
+| `walltime` | Real wall-clock time | noisy on shared runners |
+
+`simulation` and `memory` are both split into 4 parallel shards via
+`--benchmark_filter`:
 
 | Shard | Filter | Benchmarks |
 | --- | --- | --- |
@@ -91,13 +103,22 @@ on pull requests, split into 4 parallel shards via `--benchmark_filter`:
 | `beam-search` | `BM_SolveBeamSearch` | 12 |
 | `best` | `BM_SolveBest` | 6 |
 
-All 4 shards run in the same workflow so CodSpeed aggregates them into a
-single report. A `changes` job (via `dorny/paths-filter`) detects whether a
-pull request touched parser-related or solver-related paths and skips the
-irrelevant shard(s) — CodSpeed backfills the skipped benchmarks from the
-baseline run, so the report stays complete even on a partial run. Pushes to
-`main` and manual `workflow_dispatch` runs always run every shard, to keep
-the baseline itself complete.
+All shards for a given mode run in the same workflow so CodSpeed aggregates
+them into a single report per mode. A `changes` job (via `dorny/paths-filter`)
+detects whether a pull request touched parser-related or solver-related
+paths and skips the irrelevant shard(s) for `simulation`/`memory` — CodSpeed
+backfills the skipped benchmarks from the baseline run, so the report stays
+complete even on a partial run. Pushes to `main` and manual
+`workflow_dispatch` runs always run every shard, to keep the baseline itself
+complete.
+
+`walltime` is handled separately: CodSpeed recommends its own Hosted Macro
+Runners for stable wall-clock numbers, and this repo runs on plain
+`ubuntu-latest`, so walltime results here are directional, not gating.
+It only runs on push to `main` / manual `workflow_dispatch` (never on pull
+requests), and only covers the two solver-heavy shards (`beam-search`,
+`best`) — the strategies where `simulation` has already shown the most
+expensive and least linear scaling.
 
 ## Adding a benchmark
 

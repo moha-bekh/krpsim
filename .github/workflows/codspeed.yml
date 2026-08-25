@@ -73,8 +73,8 @@ jobs:
 
           echo "shards=$(echo "$shards" | jq -c .)" >> "$GITHUB_OUTPUT"
 
-  benchmarks:
-    name: Run benchmarks (${{ matrix.shard.name }})
+  benchmarks-simulation:
+    name: Run benchmarks - simulation (${{ matrix.shard.name }})
     needs: changes
     if: needs.changes.outputs.shards != '[]'
     runs-on: ubuntu-latest
@@ -97,4 +97,64 @@ jobs:
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation
+          run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.shard.benchmark_filter }}'
+
+  # Deterministic like simulation (allocation counting, not wall-clock), so it
+  # runs on the same trigger/partial-run rules and shard split.
+  benchmarks-memory:
+    name: Run benchmarks - memory (${{ matrix.shard.name }})
+    needs: changes
+    if: needs.changes.outputs.shards != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the benchmark target(s)
+        run: |
+          cmake -B build_bench -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCODSPEED_MODE=memory
+          cmake --build build_bench -j
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: memory
+          run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.shard.benchmark_filter }}'
+
+  # Wall-clock timing is noisy on shared GitHub-hosted runners (CodSpeed
+  # recommends its own Hosted Macro Runners for stable walltime numbers), so
+  # this doesn't gate every PR: only the two solver-heavy shards run, and
+  # only on push to main / manual dispatch, purely as an investigative signal
+  # alongside the simulation/memory numbers.
+  benchmarks-walltime:
+    name: Run benchmarks - walltime (${{ matrix.shard.name }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - { name: beam-search, benchmark_filter: "BM_SolveBeamSearch" }
+          - { name: best, benchmark_filter: "BM_SolveBest" }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the benchmark target(s)
+        run: |
+          cmake -B build_bench -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCODSPEED_MODE=walltime
+          cmake --build build_bench -j
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: walltime
           run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.shard.benchmark_filter }}'
