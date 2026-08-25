@@ -1,0 +1,31 @@
+name: CodSpeed Benchmarks
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+  # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    permissions: # optional for public repositories
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the benchmark target(s)
+        run: |
+          cmake -B build_bench -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCODSPEED_MODE=simulation
+          cmake --build build_bench -j
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: simulation
+          run: ./build_bench/benchmarks/krpsim_bench

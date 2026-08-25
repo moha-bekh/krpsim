@@ -3,4 +3,5 @@
 *.o
 *.d
 build/
+build_bench/
 .DS_Store
