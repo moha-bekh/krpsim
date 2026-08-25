@@ -614,7 +614,8 @@ std::vector<BeamNode> expandNode(
 
 bool isBetterResultUsingWeights(
     const Config& config,
-    const SimulationResult& candidate,
+    const SimulationState& candidateState,
+    const Trace& candidateTrace,
     const SimulationResult& currentBest,
     const std::map<std::string, Quantity>& weights
 )
@@ -622,7 +623,7 @@ bool isBetterResultUsingWeights(
     bool hasOptimizedResource = false;
 
     for (const std::string& resource : config.optimizeResources) {
-        const Quantity candidateQuantity = getStockQuantity(candidate.finalState.stocks, resource);
+        const Quantity candidateQuantity = getStockQuantity(candidateState.stocks, resource);
         const Quantity bestQuantity = getStockQuantity(currentBest.finalState.stocks, resource);
 
         if (candidateQuantity > 0 || bestQuantity > 0) {
@@ -635,15 +636,15 @@ bool isBetterResultUsingWeights(
 
     if (config.optimizeTime
         && hasOptimizedResource
-        && candidate.finalState.cycle != currentBest.finalState.cycle) {
-        return candidate.finalState.cycle < currentBest.finalState.cycle;
+        && candidateState.cycle != currentBest.finalState.cycle) {
+        return candidateState.cycle < currentBest.finalState.cycle;
     }
 
     const long long candidateProgress = scoreBeamState(
         config,
-        candidate.finalState,
+        candidateState,
         weights,
-        candidate.trace
+        candidateTrace
     );
     const long long bestProgress = scoreBeamState(
         config,
@@ -656,10 +657,23 @@ bool isBetterResultUsingWeights(
         return candidateProgress > bestProgress;
     }
 
-    if (config.optimizeTime && candidate.finalState.cycle != currentBest.finalState.cycle) {
-        return candidate.finalState.cycle < currentBest.finalState.cycle;
+    if (config.optimizeTime && candidateState.cycle != currentBest.finalState.cycle) {
+        return candidateState.cycle < currentBest.finalState.cycle;
     }
-    return candidate.trace.size() < currentBest.trace.size();
+    return candidateTrace.size() < currentBest.trace.size();
+}
+
+// Thin wrapper for callers (e.g. the public isBetterResult) that already
+// have a full SimulationResult on hand; solveBeamSearch's hot loop calls the
+// state+trace overload above directly to avoid building one just to compare it.
+bool isBetterResultUsingWeights(
+    const Config& config,
+    const SimulationResult& candidate,
+    const SimulationResult& currentBest,
+    const std::map<std::string, Quantity>& weights
+)
+{
+    return isBetterResultUsingWeights(config, candidate.finalState, candidate.trace, currentBest, weights);
 }
 
 SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle) {
@@ -692,16 +706,13 @@ SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle) {
   while (!beam.empty()) {
     std::vector<BeamNode> candidates;
 
-    for (BeamNode node : beam) {
+    for (BeamNode& node : beam) {
       completeEventsAtCycle(node.state, node.state.cycle);
 
-      SimulationResult candidateResult;
-      candidateResult.solverName = "solveBeamSearch";
-      candidateResult.finalState = node.state;
-      candidateResult.trace = node.trace;
-
-      if (isBetterResultUsingWeights(config, candidateResult, best, weights)) {
-        best = candidateResult;
+      if (isBetterResultUsingWeights(config, node.state, node.trace, best, weights)) {
+        best.solverName = "solveBeamSearch";
+        best.finalState = node.state;
+        best.trace = node.trace;
       }
 
       if (node.trace.size() >= maxTraceLength) {
@@ -729,7 +740,7 @@ SimulationResult solveBeamSearch(const Config& config, Cycle maxCycle) {
       candidates.resize(beamWidth);
     }
 
-    beam = candidates;
+    beam = std::move(candidates);
   }
 
   finalizeResult(best, maxCycle);
