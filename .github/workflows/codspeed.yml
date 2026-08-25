@@ -10,16 +10,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Detects which parts of the benchmark suite are affected by this change,
-  # so pull requests only run the relevant shards (partial run). Pushes to
-  # main and manual dispatches always run everything to keep a complete
-  # baseline for future comparisons.
+  # Detects which parts of the benchmark suite are affected by this change
+  # and builds the list of shards to run. Pull requests only get the
+  # shard(s) touched by the change (partial run); pushes to main and manual
+  # dispatches always run every shard, to keep a complete baseline.
   changes:
     name: Detect affected benchmark shards
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
-      parser: ${{ steps.filter.outputs.parser }}
-      solver: ${{ steps.filter.outputs.solver }}
+      shards: ${{ steps.shards.outputs.shards }}
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
@@ -45,10 +46,37 @@ jobs:
               - 'benchmarks/CMakeLists.txt'
               - 'CMakeLists.txt'
 
+      - name: Compute benchmark shards
+        id: shards
+        env:
+          PARSER_CHANGED: ${{ steps.filter.outputs.parser }}
+          SOLVER_CHANGED: ${{ steps.filter.outputs.solver }}
+          RUN_ALL: ${{ github.event_name != 'pull_request' }}
+        run: |
+          shards='[]'
+          add() {
+            shards=$(echo "$shards" | jq --arg n "$1" --arg f "$2" '. + [{"name": $n, "benchmark_filter": $f}]')
+          }
+
+          if [ "$RUN_ALL" = "true" ] || [ "$PARSER_CHANGED" = "true" ]; then
+            add "parser" "BM_ParseConfig"
+          fi
+          if [ "$RUN_ALL" = "true" ] || [ "$SOLVER_CHANGED" = "true" ]; then
+            # Splitting solver coverage into 3 shards keeps each job well
+            # under the recommended 1,000-benchmarks-per-shard limit and
+            # lets solveBeamSearch (the heaviest strategy) run in parallel
+            # with the cheaper ones instead of behind them.
+            add "cheap-solvers" "BM_Solve(Naive|TargetPlan|GreedyByScore)"
+            add "beam-search" "BM_SolveBeamSearch"
+            add "best" "BM_SolveBest"
+          fi
+
+          echo "shards=$(echo "$shards" | jq -c .)" >> "$GITHUB_OUTPUT"
+
   benchmarks:
-    name: Run benchmarks (${{ matrix.name }})
+    name: Run benchmarks (${{ matrix.shard.name }})
     needs: changes
-    if: needs.changes.outputs[matrix.changed_key] == 'true' || github.event_name != 'pull_request'
+    if: needs.changes.outputs.shards != '[]'
     runs-on: ubuntu-latest
     permissions: # optional for public repositories
       contents: read # required for actions/checkout
@@ -56,23 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Splitting into shards keeps each CodSpeed job well under the
-          # recommended 1,000-benchmarks-per-shard limit and lets them run
-          # in parallel; it also lets partial runs skip whichever shard
-          # wasn't touched by a given pull request.
-          - name: parser
-            changed_key: parser
-            benchmark_filter: "BM_ParseConfig"
-          - name: cheap-solvers
-            changed_key: solver
-            benchmark_filter: "BM_Solve(Naive|TargetPlan|GreedyByScore)"
-          - name: beam-search
-            changed_key: solver
-            benchmark_filter: "BM_SolveBeamSearch"
-          - name: best
-            changed_key: solver
-            benchmark_filter: "BM_SolveBest"
+        shard: ${{ fromJSON(needs.changes.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
 
@@ -85,4 +97,4 @@ jobs:
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation
-          run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.benchmark_filter }}'
+          run: ./build_bench/benchmarks/krpsim_bench --benchmark_filter='${{ matrix.shard.benchmark_filter }}'
