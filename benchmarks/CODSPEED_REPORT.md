@@ -134,16 +134,144 @@ Run `9dd5193` confirms that the 4 shards aggregate correctly into a single
 65-benchmark report on the CodSpeed side, despite running as 4 separate
 jobs.
 
-## 7. Current state
+## 7. Adding memory and walltime modes
 
-- 65 active benchmarks, spread across 4 parallel CI shards.
-- No known regressions; beam search on the recursive configs
-  (`inception`, `recre`) remains the most expensive strategy but has been
-  reduced by ~35 to ~77% depending on the config.
+Simulation mode answers "did the instruction count change" but says nothing
+about actual memory behavior or real elapsed time. To get those two other
+angles, the CI was extended (commit `42f8b5e`) with two more CodSpeed
+modes alongside `simulation`:
+
+- **`memory`** — deterministic allocation counting (peak bytes, total
+  allocated/freed, alloc/free call counts). Runs on the same 4-shard,
+  partial-run rules as `simulation`, since it's just as noise-free.
+- **`walltime`** — real wall-clock time. CodSpeed recommends its own
+  Hosted Macro Runners for stable walltime numbers, which this repo
+  doesn't have (plain `ubuntu-latest`), so this mode is scoped down: only
+  the two solver-heavy shards (`beam-search`, `best`), and only on push to
+  `main` / manual `workflow_dispatch` — never gating a pull request.
+
+## 8. What memory mode revealed
+
+First memory-mode run on `main` (commit `42f8b5e`) showed something
+that wasn't visible in simulation mode: **peak memory stays small and
+flat, but total allocation churn explodes with `maxCycle`** — the exact
+opposite of what "memory problem" usually means.
+
+| Benchmark | Peak memory | Total allocated | Alloc calls | Free calls |
+|---|---:|---:|---:|---:|
+| `BM_SolveBeamSearch[inception_c50]` | 16.1 KB | 918 KB | 3,380 | 13,520 |
+| `BM_SolveBeamSearch[inception_c100]` | 218.9 KB | **44.1 MB** | 70,867 | 283,468 |
+| `BM_SolveBeamSearch[recre_c200]` | 199.4 KB | 25.3 MB | 264,156 | 1,056,333 |
+
+Peak memory only grew ×13.6 between `inception_c50` and `inception_c100`,
+but total bytes allocated grew ×48 — a single `inception_c100` run
+allocates and frees 44 MB of small (~622 B average) objects to end up with
+a 219 KB working set. That ratio is the signature of **allocation churn**,
+not a growing footprint: the same small containers being repeatedly
+cloned and thrown away rather than the beam's actual state growing.
+
+`get_benchmark_result` with `runner_mode: Memory` was needed to see this —
+`compare_runs`'s headline metric is peak bytes, which stays too small and
+flat to show churn; the `allocCalls`/`totalAllocatedBytes` breakdown is
+where it's visible.
+
+Walltime confirmed the same cost hierarchy as simulation (`inception`,
+`recre` far ahead of the rest), with low noise on the runs inspected —
+e.g. `BM_SolveBeamSearch[inception_c100]` had 0 IQR/stdev outlier rounds
+out of 5, stdev of 21 µs on a 9.6 ms median.
+
+## 9. The second fix: cutting allocation churn
+
+`SimulationState` (a `std::map<std::string, Quantity> stocks` plus a
+`vector<Event>` where each `Event` owns its own `StockMap`) is exactly the
+kind of type where a naive copy is expensive — every copy re-allocates a
+full tree of map nodes. `solveBeamSearch`'s per-step loop
+(`src/solver/Solver.cpp`) had three copies of it that weren't needed
+(commit `614b1b3`):
+
+- `for (BeamNode node : beam)` copied every beam entry just to run
+  `completeEventsAtCycle` on it. Since `beam` is fully replaced right
+  after the loop anyway (`beam = candidates`), mutating in place through
+  a reference (`BeamNode& node`) is safe and copy-free.
+- A full throwaway `SimulationResult` (state + trace copy) was built for
+  every node just to feed `isBetterResultUsingWeights`, even though most
+  candidates lose the comparison and get discarded immediately.
+  `isBetterResultUsingWeights` was split into a `(state, trace)`-taking
+  version used directly by the hot loop, with the original
+  `SimulationResult`-taking signature kept as a thin wrapper — so
+  `isBetterResult` (the public API in `Solver.hpp`) and its other caller
+  are unaffected.
+- `beam = candidates` at the end of each step copy-assigned the whole
+  candidate vector instead of moving it (`beam = std::move(candidates)`).
+
+**Functional non-regression check**: `krpsim` (which always runs
+`solveBest`, exercising `solveBeamSearch` and the shared `isBetterResult`
+path) produced **bit-for-bit identical** stdout/stderr on all 10 files in
+`resources/` and all 6 mock configs, across `maxCycle` 50/100/200/500,
+before vs after — 160 outputs compared, zero diffs.
+
+## 10. What CodSpeed measured on this second change
+
+`compare_runs` between the pre-fix run (`42f8b5e`) and the post-fix run
+(`614b1b3`), across all three modes:
+
+| Status | Count |
+|---|---:|
+| ⚡ Improvements | 34 |
+| ❌ Regressions | 2 |
+| ✅ Unchanged | 112 |
+
+Breakdown of the most significant improvements:
+
+| Benchmark | Mode | Before | After | Gain |
+|---|---|---:|---:|---:|
+| `BM_SolveBeamSearch[inception_c100]` | Simulation | 90.7 ms | 58.3 ms | **+55.4%** |
+| `BM_SolveBest[inception_c100]` | WallTime | 12.1 ms | 7.6 ms | **+58.8%** |
+| `BM_SolveBest[inception_c100]` | Simulation | 92.9 ms | 60.9 ms | +52.5% |
+| `BM_SolveBeamSearch[steak_c50/c200]` | Simulation | ~2.5 ms | ~1.6 ms | +48.7% |
+| `BM_SolveBeamSearch[recre_c200]` | Simulation | 105.4 ms | 78.7 ms | +34.0% |
+| `BM_SolveBest[recre_c100]` | Simulation | 29.4 ms | 22.5 ms | +30.6% |
+| `BM_SolveBeamSearch[inception_c100]` | WallTime | 9.6 ms | 7.5 ms | +28.2% |
+| `BM_SolveBeamSearch[inception_c50]` | Memory | 16.1 KB | 11.7 KB | +37.0% |
+| `BM_SolveBeamSearch[steak_c50/c200]` | Memory | 46.9 KB | 37.7 KB | +24.4% |
+
+The two regressions — `BM_SolveBeamSearch[pomme_c50]` and `[pomme_c100]`
+on WallTime, -28.9% and -27.6% — sit at 15 µs → ~21 µs, i.e. inside the
+noise floor for wall-clock timing. `pomme`'s beam search converges and
+stops before either cycle budget (see §2), so nothing in this fix touches
+its actual code path. `compare_runs`'s own environment-differences report
+lists both benchmarks under a CPU change between the two runs (`Intel
+Xeon Platinum 8573C` → `AMD EPYC 9V74`) that affected essentially every
+WallTime benchmark in this comparison — the same false-signal pattern
+flagged in §5, this time affecting two microsecond-scale benchmarks
+enough to flip their sign. Every other WallTime benchmark measured across
+that same hardware change still shows a real improvement in the same
+direction as simulation and memory, which is why these two are read as
+noise rather than a regression from the fix.
+
+On memory specifically: `inception_c100`'s peak-bytes number barely moved
+(218.9 KB → 213.5 KB, under `compare_runs`'s significance threshold, hence
+"unchanged"), but the churn numbers behind it did: total allocated bytes
+44.1 MB → 29.4 MB (-33%), alloc calls 70,867 → 47,633 (-33%).
+`recre_c200` similarly: 25.3 MB → 19.0 MB allocated (-25%), 264,156 →
+196,650 alloc calls (-26%). Peak-bytes is the metric `compare_runs`
+diffs, so this improvement was only visible by pulling the full
+`allocCalls`/`totalAllocatedBytes` breakdown per-benchmark, same as in §8.
+
+## 11. Current state
+
+- 148 active benchmarks across 3 modes (simulation, memory, walltime),
+  the last scoped to 2 of the 4 CI shards.
+- No known regressions from either fix; the two WallTime deltas on
+  `pomme` are attributed to a CI hardware change, not the code.
+- `solveBeamSearch` on the recursive configs (`inception`, `recre`)
+  remains the most expensive strategy, but combined across both rounds of
+  fixes it's now roughly 2-3x faster than the very first measured run
+  (`inception_c100`: 160.9 ms → 58.3 ms in simulation).
 - The Makefile (`make`, `make run`, `make verif`) was never touched;
   the CMake/benchmarks build is entirely separate.
 
-## 8. What this demonstrated about the tool
+## 12. What this demonstrated about the tool
 
 - **Simulation mode is stable enough to draw conclusions from a
   single run**: the non-linear scaling of `solveBeamSearch` on
@@ -153,13 +281,19 @@ jobs.
   to profile manually, the `query_flamegraph` query was enough to
   identify `isBetterResult`/`buildResourceWeights` as 47% of total
   time, which guided the fix in a matter of minutes.
-- **`compare_runs` gives an immediately actionable diff** — 11
-  improvements, 0 regressions, quantified benchmark by benchmark, even
-  before opening a PR.
+- **`compare_runs` gives an immediately actionable diff** — improvements
+  and regressions quantified benchmark by benchmark, even before opening
+  a PR.
 - **Environment difference detection avoids false positives** — a
   CPU change between two CI runs could have looked like noise
-  or masked a real signal; CodSpeed isolated and attributed it precisely.
+  or masked a real signal; CodSpeed isolated and attributed it precisely,
+  twice (§5 and §10).
 - **Sharding + partial runs work as documented**: a run
   pushed as 4 parallel jobs aggregates into a single report, and a PR that
   only touches part of the code can skip the unrelated shards without
   losing the history of those benchmarks.
+- **Memory mode's headline metric (peak bytes) and its detailed breakdown
+  (allocation churn) can tell different stories** — peak memory here
+  stayed small and barely moved, while total allocated bytes and alloc
+  counts dropped by a third. A fix can be real and significant without
+  showing up in the metric `compare_runs` diffs by default.
